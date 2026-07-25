@@ -381,3 +381,20 @@ export const commentsRelations = relations(comments, ({ one }) => ({
   bet: one(bets, { fields: [comments.betId], references: [bets.id] }),
   user: one(users, { fields: [comments.userId], references: [users.id] }),
 }));
+
+export const amendmentsRelations = relations(amendments, ({ one, many }) => ({
+  bet: one(bets, { fields: [amendments.betId], references: [bets.id] }),
+  proposer: one(users, {
+    fields: [amendments.proposedBy],
+    references: [users.id],
+  }),
+  votes: many(amendmentVotes),
+}));
+
+export const amendmentVotesRelations = relations(amendmentVotes, ({ one }) => ({
+  amendment: one(amendments, {
+    fields: [amendmentVotes.amendmentId],
+    references: [amendments.id],
+  }),
+  user: one(users, { fields: [amendmentVotes.userId], references: [users.id] }),
+}));

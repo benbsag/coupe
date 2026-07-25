@@ -23,6 +23,10 @@ export async function getBetBySlug(slug: string) {
         orderBy: (a, { desc }) => [desc(a.createdAt)],
         with: { actor: true },
       },
+      amendments: {
+        orderBy: (a, { desc }) => [desc(a.createdAt)],
+        with: { proposer: true, votes: { with: { user: true } } },
+      },
     },
   });
   return bet ?? null;

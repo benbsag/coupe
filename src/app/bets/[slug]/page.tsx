@@ -5,6 +5,7 @@ import { getBetBySlug } from "@/lib/queries/bets";
 import { Header } from "@/components/header";
 import { PressureGauge } from "@/components/pressure-gauge";
 import { WithdrawButton } from "@/components/withdraw-button";
+import { AmendmentPanel } from "@/components/amendment-panel";
 import { shortHash } from "@/lib/hash";
 import { formatZurich } from "@/lib/dates";
 import { gaugeTarget, initials, statusColorClass, statusLabel } from "@/lib/bet-display";
@@ -14,6 +15,8 @@ const KIND_LABEL: Record<string, string> = {
   EVENT_TRIGGERED: "Event-triggered",
   CONTINGENT: "Contingent",
 };
+
+const AMENDABLE_STATUSES = ["ACTIVE", "AWAITING_RESOLUTION", "DISPUTED"];
 
 export default async function BetDetailPage({
   params,
@@ -35,6 +38,10 @@ export default async function BetDetailPage({
   const target = gaugeTarget(bet);
   const canWithdraw =
     bet.createdBy === user.id && (bet.status === "DRAFT" || bet.status === "PROPOSED");
+
+  const openAmendment = bet.amendments.find((a) => a.status === "OPEN");
+  const canProposeAmendment =
+    hasPosition && AMENDABLE_STATUSES.includes(bet.status) && !openAmendment;
 
   return (
     <div className="flex flex-col flex-1">
@@ -75,6 +82,43 @@ export default async function BetDetailPage({
             <h2 className="text-sm text-lees">Stake note</h2>
             <p className="text-craie">{bet.stakeNote}</p>
           </section>
+        )}
+
+        {openAmendment && (
+          <AmendmentPanel
+            slug={bet.slug}
+            amendment={{
+              id: openAmendment.id,
+              reason: openAmendment.reason,
+              proposedBy: openAmendment.proposedBy,
+              proposer: { name: openAmendment.proposer.name },
+              proposedPayload: openAmendment.proposedPayload as {
+                kind: string;
+                statement: string;
+                terms: string;
+                resolutionCriteria: string;
+                resolutionDate: string | null;
+                longStopDate: string | null;
+                stakeNote: string | null;
+              },
+              votes: openAmendment.votes.map((v) => ({
+                userId: v.userId,
+                decision: v.decision,
+                user: { name: v.user.name },
+              })),
+            }}
+            currentBet={{
+              kind: bet.kind,
+              statement: bet.statement,
+              terms: bet.terms,
+              resolutionCriteria: bet.resolutionCriteria,
+              resolutionDate: bet.resolutionDate,
+              longStopDate: bet.longStopDate,
+              stakeNote: bet.stakeNote,
+            }}
+            positionUserIds={bet.positions.map((p) => p.userId)}
+            currentUserId={user.id}
+          />
         )}
 
         <section className="flex flex-col gap-2">
@@ -128,7 +172,7 @@ export default async function BetDetailPage({
             {bet.activity.map((a) => (
               <div key={a.id} className="flex items-center justify-between text-xs">
                 <span className="text-craie">
-                  {a.actor?.name ?? "System"} — {a.action.toLowerCase()}
+                  {a.actor?.name ?? "System"} — {a.action.toLowerCase().replace(/_/g, " ")}
                 </span>
                 <span className="font-utility text-lees">{formatZurich(a.createdAt)}</span>
               </div>
@@ -136,7 +180,17 @@ export default async function BetDetailPage({
           </div>
         </section>
 
-        {canWithdraw && <WithdrawButton betId={bet.id} />}
+        <div className="flex items-center gap-4">
+          {canWithdraw && <WithdrawButton betId={bet.id} />}
+          {canProposeAmendment && (
+            <Link
+              href={`/bets/${slug}/amend`}
+              className="text-verre text-sm hover:underline"
+            >
+              Propose amendment
+            </Link>
+          )}
+        </div>
 
         <Link href="/" className="text-lees text-sm hover:text-craie">
           ← Back to the book

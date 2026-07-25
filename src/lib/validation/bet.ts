@@ -39,7 +39,7 @@ export interface ParsedBetDates {
  * parsing happens (see zurichEndOfDayToUtc).
  */
 export function enforceHardRules(
-  input: CreateBetInput,
+  input: Pick<CreateBetInput, "kind">,
   dates: {
     resolutionDateRaw: string | null;
     resolutionDateParsed: Date | null;
