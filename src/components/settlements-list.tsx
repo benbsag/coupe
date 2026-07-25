@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { markSettlementPaid } from "@/lib/actions/settlements";
 import { formatZurich } from "@/lib/dates";
 
@@ -14,6 +15,7 @@ interface Settlement {
   status: "OWED" | "PAID";
   paidAt: Date | null;
   paidNote: string | null;
+  bet?: { slug: string; statement: string };
 }
 
 function SettlementRow({
@@ -55,6 +57,14 @@ function SettlementRow({
             : "Owed"}
         </span>
       </div>
+      {settlement.bet && (
+        <Link
+          href={`/bets/${settlement.bet.slug}`}
+          className="text-lees text-xs hover:text-craie -mt-1"
+        >
+          {settlement.bet.statement}
+        </Link>
+      )}
       {settlement.paidNote && (
         <p className="text-lees text-xs italic">{settlement.paidNote}</p>
       )}
@@ -99,15 +109,21 @@ function SettlementRow({
 export function SettlementsList({
   settlements,
   currentUserId,
+  title = "Settlements",
+  emptyLabel,
 }: {
   settlements: Settlement[];
   currentUserId: string;
+  title?: string;
+  emptyLabel?: string;
 }) {
-  if (settlements.length === 0) return null;
+  if (settlements.length === 0) {
+    return emptyLabel ? <p className="text-lees text-sm">{emptyLabel}</p> : null;
+  }
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm text-lees">Settlements</h2>
+      {title && <h2 className="text-sm text-lees">{title}</h2>}
       <div className="flex flex-col gap-2">
         {settlements.map((s) => (
           <SettlementRow key={s.id} settlement={s} currentUserId={currentUserId} />

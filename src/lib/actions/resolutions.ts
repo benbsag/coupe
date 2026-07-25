@@ -198,16 +198,21 @@ export async function voteOnResolution(
 
     if (unanimous) {
       const now = new Date();
+      const isVoid = resolution.proposedOutcome === "VOID";
+
       await tx
         .update(resolutions)
         .set({ status: "CONFIRMED", confirmedAt: now })
         .where(eq(resolutions.id, resolutionId));
+      // A VOID outcome counts against nobody (§7) — it belongs in the same
+      // terminal bucket as a withdrawn/lapsed bet, not "Settled", and must
+      // never carry a resolvedAt that would make it look like a real result.
       await tx
         .update(bets)
-        .set({ status: "RESOLVED", resolvedAt: now })
+        .set(isVoid ? { status: "VOID" } : { status: "RESOLVED", resolvedAt: now })
         .where(eq(bets.id, bet.id));
 
-      if (resolution.proposedOutcome !== "VOID") {
+      if (!isVoid) {
         const winningSide = resolution.proposedOutcome;
         const winners = allPositions.filter((p) => p.side === winningSide);
         const losers = allPositions.filter((p) => p.side !== winningSide);
@@ -229,7 +234,7 @@ export async function voteOnResolution(
       await tx.insert(activityLog).values({
         betId: bet.id,
         actorId: user.id,
-        action: "RESOLVED",
+        action: isVoid ? "VOIDED" : "RESOLVED",
         meta: { resolutionId, outcome: resolution.proposedOutcome },
       });
 

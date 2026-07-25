@@ -9,6 +9,18 @@ export function Header({ userName }: { userName: string }) {
       </Link>
       <div className="flex items-center gap-3">
         <Link
+          href="/cellar"
+          className="text-lees text-sm hover:text-craie transition-colors"
+        >
+          Cellar
+        </Link>
+        <Link
+          href="/debts"
+          className="text-lees text-sm hover:text-craie transition-colors"
+        >
+          Debts
+        </Link>
+        <Link
           href="/bets/new"
           className="bg-verre text-cave text-sm font-medium rounded-sm px-3 py-1.5 hover:brightness-110 transition-colors"
         >
