@@ -13,6 +13,9 @@ import {
 } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/current-user";
 import { proposeResolutionSchema } from "@/lib/validation/resolution";
+import { dispatchImmediate, dispatchResolutionNotifications } from "@/lib/notifications/dispatch";
+import { cancelAllPendingNotifications } from "@/lib/notifications/schedule";
+import { otherParticipants, betPositionUsers } from "@/lib/notifications/participants";
 import type { ActionResult } from "./bets";
 
 const RESOLVABLE_STATUSES = ["ACTIVE", "AWAITING_RESOLUTION", "DISPUTED"];
@@ -59,7 +62,7 @@ export async function proposeResolution(
     };
   }
 
-  await db.transaction(async (tx) => {
+  const resolutionId = await db.transaction(async (tx) => {
     const [resolution] = await tx
       .insert(resolutions)
       .values({
@@ -90,7 +93,21 @@ export async function proposeResolution(
         .set({ status: "AWAITING_RESOLUTION" })
         .where(eq(bets.id, betId));
     }
+
+    return resolution.id;
   });
+
+  const others = await otherParticipants(betId, user.id);
+  for (const recipient of others) {
+    await dispatchImmediate({
+      betId,
+      userId: recipient.id,
+      kind: "OUTCOME_PROPOSED",
+      eventId: resolutionId,
+      betStatement: bet.statement,
+      placeholders: { proposer: user.name },
+    });
+  }
 
   revalidatePath(`/bets/${bet.slug}`);
   return { ok: true, slug: bet.slug };
@@ -157,7 +174,13 @@ export async function voteOnResolution(
         action: "OUTCOME_DISPUTED",
         meta: { resolutionId },
       });
-      return { ok: true, slug: bet.slug };
+      return {
+        ok: true,
+        slug: bet.slug,
+        betId: bet.id,
+        betStatement: bet.statement,
+        outcome: "disputed" as const,
+      };
     }
 
     const allPositions = await tx
@@ -209,10 +232,49 @@ export async function voteOnResolution(
         action: "RESOLVED",
         meta: { resolutionId, outcome: resolution.proposedOutcome },
       });
+
+      return {
+        ok: true,
+        slug: bet.slug,
+        betId: bet.id,
+        betStatement: bet.statement,
+        outcome: "confirmed" as const,
+        resolutionId,
+        proposedOutcome: resolution.proposedOutcome,
+      };
     }
 
-    return { ok: true, slug: bet.slug };
+    return { ok: true, slug: bet.slug, outcome: "pending" as const };
   });
+
+  if (!result.ok) return result;
+
+  if (result.outcome === "disputed") {
+    const others = await otherParticipants(result.betId, user.id);
+    for (const recipient of others) {
+      await dispatchImmediate({
+        betId: result.betId,
+        userId: recipient.id,
+        kind: "OUTCOME_DISPUTED",
+        eventId: resolutionId,
+        betStatement: result.betStatement,
+      });
+    }
+  }
+
+  if (result.outcome === "confirmed") {
+    const positionUsers = await betPositionUsers(result.betId);
+    await dispatchResolutionNotifications({
+      betId: result.betId,
+      betStatement: result.betStatement,
+      resolutionId: result.resolutionId,
+      outcome: result.proposedOutcome,
+      positionUsers,
+    });
+    // Bet is settled — no point reminding anyone about a deadline that no
+    // longer matters.
+    await cancelAllPendingNotifications(result.betId);
+  }
 
   if (result.slug) revalidatePath(`/bets/${result.slug}`);
   return result;

@@ -16,6 +16,12 @@ import { proposeAmendmentSchema } from "@/lib/validation/amendment";
 import { enforceHardRules } from "@/lib/validation/bet";
 import { zurichEndOfDayToUtc } from "@/lib/dates";
 import { contentHashFor } from "@/lib/hash";
+import { dispatchImmediate } from "@/lib/notifications/dispatch";
+import {
+  cancelPendingThresholds,
+  scheduleThresholdNotifications,
+} from "@/lib/notifications/schedule";
+import { otherParticipants } from "@/lib/notifications/participants";
 import type { ActionResult } from "./bets";
 
 const AMENDABLE_STATUSES = ["ACTIVE", "AWAITING_RESOLUTION", "DISPUTED"];
@@ -109,7 +115,7 @@ export async function proposeAmendment(
     stakeNote: input.stakeNote || null,
   };
 
-  await db.transaction(async (tx) => {
+  const amendmentId = await db.transaction(async (tx) => {
     const [amendment] = await tx
       .insert(amendments)
       .values({
@@ -132,7 +138,21 @@ export async function proposeAmendment(
       action: "AMENDMENT_PROPOSED",
       meta: { amendmentId: amendment.id, reason: input.reason },
     });
+
+    return amendment.id;
   });
+
+  const others = await otherParticipants(betId, user.id);
+  for (const recipient of others) {
+    await dispatchImmediate({
+      betId,
+      userId: recipient.id,
+      kind: "AMENDMENT_PROPOSED",
+      eventId: amendmentId,
+      betStatement: bet.statement,
+      placeholders: { proposer: user.name },
+    });
+  }
 
   revalidatePath(`/bets/${bet.slug}`);
   return { ok: true, slug: bet.slug };
@@ -195,7 +215,13 @@ export async function voteOnAmendment(
         action: "AMENDMENT_REJECTED",
         meta: { amendmentId },
       });
-      return { ok: true, slug: bet.slug };
+      return {
+        ok: true,
+        slug: bet.slug,
+        betId: bet.id,
+        betStatement: bet.statement,
+        outcome: "rejected" as const,
+      };
     }
 
     // Unanimous or nothing (§3): every current position-holder needs an
@@ -275,10 +301,43 @@ export async function voteOnAmendment(
         action: "AMENDMENT_APPROVED",
         meta: { amendmentId, contentHash },
       });
+
+      const dateChanged =
+        bet.resolutionDate?.getTime() !== jsonbDate(payload.resolutionDate)?.getTime() ||
+        bet.longStopDate?.getTime() !== jsonbDate(payload.longStopDate)?.getTime();
+
+      return {
+        ok: true,
+        slug: bet.slug,
+        betId: bet.id,
+        betStatement: payload.statement,
+        outcome: "approved" as const,
+        dateChanged,
+      };
     }
 
-    return { ok: true, slug: bet.slug };
+    return { ok: true, slug: bet.slug, outcome: "pending" as const };
   });
+
+  if (!result.ok) return result;
+
+  if (result.outcome === "rejected" || result.outcome === "approved") {
+    const others = await otherParticipants(result.betId!, user.id);
+    for (const recipient of others) {
+      await dispatchImmediate({
+        betId: result.betId!,
+        userId: recipient.id,
+        kind: result.outcome === "approved" ? "AMENDMENT_APPROVED" : "AMENDMENT_REJECTED",
+        eventId: amendmentId,
+        betStatement: result.betStatement!,
+      });
+    }
+  }
+
+  if (result.outcome === "approved" && result.dateChanged) {
+    await cancelPendingThresholds(result.betId!);
+    await scheduleThresholdNotifications(result.betId!);
+  }
 
   if (result.slug) revalidatePath(`/bets/${result.slug}`);
   return result;

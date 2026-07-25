@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
 import { authConfig } from "@/auth.config";
 import { CoupeAdapter } from "@/lib/auth-adapter";
+import { sendMail } from "@/lib/email";
 
 const allowedEmails = new Set(
   (process.env.ALLOWED_EMAILS ?? "")
@@ -20,23 +21,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       apiKey: process.env.RESEND_API_KEY || "dev-no-key",
       from: process.env.EMAIL_FROM,
       async sendVerificationRequest({ identifier, url }) {
-        if (!process.env.RESEND_API_KEY) {
-          // Local dev without a Resend key: print the magic link instead of
-          // sending mail, so sign-in still works end to end.
-          console.log(`\n[coupe] magic link for ${identifier}:\n${url}\n`);
-          return;
-        }
-        const { Resend: ResendClient } = await import("resend");
-        const resend = new ResendClient(process.env.RESEND_API_KEY);
-        const { error } = await resend.emails.send({
-          from: process.env.EMAIL_FROM ?? "Coupe <coupe@localhost>",
+        await sendMail({
           to: identifier,
           subject: "Sign in to Coupe",
           text: `Sign in to Coupe: ${url}\n\nThis link expires shortly and can only be used once.`,
         });
-        if (error) {
-          throw new Error(`Resend failed to send magic link: ${error.message}`);
-        }
       },
     }),
   ],

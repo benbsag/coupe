@@ -13,6 +13,7 @@ import {
 import { zurichEndOfDayToUtc } from "@/lib/dates";
 import { slugify } from "@/lib/slug";
 import { contentHashFor } from "@/lib/hash";
+import { scheduleThresholdNotifications } from "@/lib/notifications/schedule";
 
 export interface ActionResult {
   ok: boolean;
@@ -137,6 +138,8 @@ export async function acceptPosition(
 ): Promise<ActionResult> {
   const user = await requireCurrentUser();
 
+  let justLocked = false;
+
   const result = await db.transaction(async (tx) => {
     const [bet] = await tx.select().from(bets).where(eq(bets.id, betId));
     if (!bet) return { ok: false, errors: ["Bet not found."] };
@@ -207,10 +210,13 @@ export async function acceptPosition(
         action: "LOCKED",
         meta: { contentHash },
       });
+      justLocked = true;
     }
 
     return { ok: true, slug: bet.slug };
   });
+
+  if (justLocked) await scheduleThresholdNotifications(betId);
 
   revalidatePath("/");
   if (result.slug) revalidatePath(`/bets/${result.slug}`);
