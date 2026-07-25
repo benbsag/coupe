@@ -398,3 +398,36 @@ export const amendmentVotesRelations = relations(amendmentVotes, ({ one }) => ({
   }),
   user: one(users, { fields: [amendmentVotes.userId], references: [users.id] }),
 }));
+
+export const resolutionsRelations = relations(resolutions, ({ one, many }) => ({
+  bet: one(bets, { fields: [resolutions.betId], references: [bets.id] }),
+  proposer: one(users, {
+    fields: [resolutions.proposedBy],
+    references: [users.id],
+  }),
+  votes: many(resolutionVotes),
+}));
+
+export const resolutionVotesRelations = relations(resolutionVotes, ({ one }) => ({
+  resolution: one(resolutions, {
+    fields: [resolutionVotes.resolutionId],
+    references: [resolutions.id],
+  }),
+  user: one(users, { fields: [resolutionVotes.userId], references: [users.id] }),
+}));
+
+export const settlementsRelations = relations(settlements, ({ one }) => ({
+  bet: one(bets, { fields: [settlements.betId], references: [bets.id] }),
+  debtor: one(users, {
+    fields: [settlements.debtorId],
+    references: [users.id],
+  }),
+  creditor: one(users, {
+    fields: [settlements.creditorId],
+    references: [users.id],
+  }),
+  paidMarker: one(users, {
+    fields: [settlements.paidMarkedBy],
+    references: [users.id],
+  }),
+}));

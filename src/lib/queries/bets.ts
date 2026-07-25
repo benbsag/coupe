@@ -27,6 +27,17 @@ export async function getBetBySlug(slug: string) {
         orderBy: (a, { desc }) => [desc(a.createdAt)],
         with: { proposer: true, votes: { with: { user: true } } },
       },
+      resolutions: {
+        orderBy: (r, { desc }) => [desc(r.createdAt)],
+        with: { proposer: true, votes: { with: { user: true } } },
+      },
+      settlements: {
+        with: { debtor: true, creditor: true },
+      },
+      comments: {
+        orderBy: (c, { asc }) => [asc(c.createdAt)],
+        with: { user: true },
+      },
     },
   });
   return bet ?? null;

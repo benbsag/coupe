@@ -6,6 +6,9 @@ import { Header } from "@/components/header";
 import { PressureGauge } from "@/components/pressure-gauge";
 import { WithdrawButton } from "@/components/withdraw-button";
 import { AmendmentPanel } from "@/components/amendment-panel";
+import { ResolutionPanel } from "@/components/resolution-panel";
+import { SettlementsList } from "@/components/settlements-list";
+import { CommentsSection } from "@/components/comments-section";
 import { shortHash } from "@/lib/hash";
 import { formatZurich } from "@/lib/dates";
 import { gaugeTarget, initials, statusColorClass, statusLabel } from "@/lib/bet-display";
@@ -145,6 +148,33 @@ export default async function BetDetailPage({
           </div>
         </section>
 
+        <ResolutionPanel
+          betId={bet.id}
+          slug={bet.slug}
+          betStatus={bet.status}
+          resolutions={bet.resolutions.map((r) => ({
+            id: r.id,
+            proposedOutcome: r.proposedOutcome,
+            proposedBy: r.proposedBy,
+            proposer: { name: r.proposer.name },
+            evidenceUrl: r.evidenceUrl,
+            evidenceNote: r.evidenceNote,
+            status: r.status,
+            confirmedAt: r.confirmedAt,
+            createdAt: r.createdAt,
+            votes: r.votes.map((v) => ({
+              userId: v.userId,
+              agree: v.agree,
+              comment: v.comment,
+              user: { name: v.user.name },
+            })),
+          }))}
+          positionUserIds={bet.positions.map((p) => p.userId)}
+          currentUserId={user.id}
+        />
+
+        <SettlementsList settlements={bet.settlements} currentUserId={user.id} />
+
         {bet.versions.length > 0 && (
           <section className="flex flex-col gap-2">
             <h2 className="text-sm text-lees">Version history</h2>
@@ -179,6 +209,8 @@ export default async function BetDetailPage({
             ))}
           </div>
         </section>
+
+        <CommentsSection betId={bet.id} comments={bet.comments} />
 
         <div className="flex items-center gap-4">
           {canWithdraw && <WithdrawButton betId={bet.id} />}
