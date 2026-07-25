@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1784992586183,
+      "tag": "0000_lovely_jack_flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784992706857,
+      "tag": "0001_immutability_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784992850917,
+      "tag": "0002_grey_the_fury",
+      "breakpoints": true
+    }
+  ]
+}

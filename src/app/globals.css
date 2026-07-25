@@ -1,26 +1,58 @@
 @import "tailwindcss";
 
+/*
+ * Coupe is a cellar, not a bar or a sportsbook: chalk, cold, low light.
+ * This is a deliberate single palette (§10) — it does not adapt to the
+ * viewer's light/dark preference, the same way a wine label doesn't.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cave: #14161a;
+  --rack: #1e2127;
+  --craie: #dde0d8;
+  --lees: #878c83;
+  --capsule: #c9a227;
+  --marc: #9e3b3b;
+  --verre: #6e8fa0;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-cave: var(--cave);
+  --color-rack: var(--rack);
+  --color-craie: var(--craie);
+  --color-lees: var(--lees);
+  --color-capsule: var(--capsule);
+  --color-marc: var(--marc);
+  --color-verre: var(--verre);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-utility: var(--font-utility);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: color-mix(in srgb, var(--craie) 12%, transparent);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+}
+
+.font-utility {
+  font-family: var(--font-utility), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
