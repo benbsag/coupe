@@ -5,24 +5,48 @@ interface SendMailInput {
 }
 
 /**
- * Sends via Resend, or — in local dev with no RESEND_API_KEY — prints to
- * the server console instead, so every flow that sends mail keeps working
- * without a Resend account.
+ * Sends via Mailgun's HTTP API, or — in local dev with no MAILGUN_API_KEY —
+ * prints to the server console instead, so every flow that sends mail keeps
+ * working without a Mailgun account.
+ *
+ * Uses a plain fetch (no SDK dependency). On Mailgun's free sandbox domain
+ * you can only deliver to "authorized recipients" you've added in the
+ * dashboard — fine for an invite-only two-person app.
+ *
+ * MAILGUN_API_KEY   — private API key from the Mailgun dashboard
+ * MAILGUN_DOMAIN    — sending domain, e.g. sandbox1234abcd.mailgun.org
+ * MAILGUN_API_BASE  — optional; set to https://api.eu.mailgun.net for the EU
+ *                     region (defaults to the US region)
+ * EMAIL_FROM        — From header; must be an address on MAILGUN_DOMAIN
  */
 export async function sendMail({ to, subject, text }: SendMailInput): Promise<void> {
-  if (!process.env.RESEND_API_KEY) {
+  const apiKey = process.env.MAILGUN_API_KEY;
+  const domain = process.env.MAILGUN_DOMAIN;
+
+  if (!apiKey || !domain) {
     console.log(`\n[coupe] email to ${to}\nSubject: ${subject}\n${text}\n`);
     return;
   }
-  const { Resend } = await import("resend");
-  const resend = new Resend(process.env.RESEND_API_KEY);
-  const { error } = await resend.emails.send({
-    from: process.env.EMAIL_FROM ?? "Coupe <coupe@localhost>",
+
+  const base = process.env.MAILGUN_API_BASE ?? "https://api.mailgun.net";
+  const body = new URLSearchParams({
+    from: process.env.EMAIL_FROM ?? `Coupe <postmaster@${domain}>`,
     to,
     subject,
     text,
   });
-  if (error) {
-    throw new Error(`Resend failed to send mail: ${error.message}`);
+
+  const res = await fetch(`${base}/v3/${domain}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Mailgun failed to send mail (${res.status}): ${detail}`);
   }
 }

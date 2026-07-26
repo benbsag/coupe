@@ -38,10 +38,12 @@ export interface CronSummary {
 }
 
 /**
- * §4.2: runs every 15 minutes in production (Vercel Cron). Picks up due,
- * unsent notifications — both pre-scheduled threshold/deadline rows and
- * freshly queued nudges — groups them per recipient, and sends one digest
- * email when a user has 3+ due in this run, individual emails otherwise.
+ * §4.2: runs once daily in production (Vercel Cron on the Hobby plan; see
+ * vercel.json). Picks up all due, unsent notifications — both pre-scheduled
+ * threshold/deadline rows and freshly queued nudges — so a slower cadence
+ * only delays delivery, never drops it. Groups them per recipient, sending
+ * one digest email when a user has 3+ due in this run, individual emails
+ * otherwise.
  */
 export async function runNotificationCron(): Promise<CronSummary> {
   await queueDueNudges();

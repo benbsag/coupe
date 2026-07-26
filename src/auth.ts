@@ -17,8 +17,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
   trustHost: true,
   providers: [
+    // We use next-auth's Resend provider only as the magic-link plumbing
+    // (token generation + the "resend" provider id). Actual delivery is fully
+    // overridden by sendVerificationRequest below, which sends via Mailgun
+    // (see src/lib/email.ts) — so apiKey here is an unused placeholder.
     Resend({
-      apiKey: process.env.RESEND_API_KEY || "dev-no-key",
+      apiKey: "unused-delivery-handled-by-sendmail",
       from: process.env.EMAIL_FROM,
       async sendVerificationRequest({ identifier, url }) {
         await sendMail({
