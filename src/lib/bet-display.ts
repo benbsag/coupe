@@ -51,21 +51,31 @@ export function statusColorClass(status: string): string {
   }
 }
 
-export type BookSegment = "live" | "awaiting" | "settled" | "void";
+export type BookSegment = "awaiting" | "live" | "settled";
 
-export function segmentFor(status: string): BookSegment {
+// Display order on the book: bets needing a call first, live bets next,
+// then settled. Void/lapsed bets are not shown at all.
+export const SEGMENT_ORDER: BookSegment[] = ["awaiting", "live", "settled"];
+
+export const SEGMENT_LABELS: Record<BookSegment, string> = {
+  awaiting: "Awaiting call",
+  live: "Live",
+  settled: "Settled",
+};
+
+export function segmentFor(status: string): BookSegment | null {
   switch (status) {
+    case "AWAITING_RESOLUTION":
+    case "DISPUTED":
+      return "awaiting";
     case "DRAFT":
     case "PROPOSED":
     case "ACTIVE":
       return "live";
-    case "AWAITING_RESOLUTION":
-    case "DISPUTED":
-      return "awaiting";
     case "RESOLVED":
       return "settled";
     default:
-      return "void";
+      return null; // VOID / LAPSED — not tracked on the book
   }
 }
 

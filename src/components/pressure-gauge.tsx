@@ -12,9 +12,10 @@ interface PressureGaugeProps {
 
 /**
  * The signature element (§10): a bar from lock date to resolution date,
- * filling as time passes, with notification thresholds marked as ticks —
- * passed ticks drawn in --capsule. Works at 4px in a list row and 40px on
- * the detail page. Fills once on mount; nothing else animates.
+ * filling as time passes. On the large (detail-page) gauge the notification
+ * thresholds are marked as ticks — passed ticks drawn in --capsule; the
+ * compact list-row gauge omits them, where at 4px tall they only read as
+ * noise. Fills once on mount; nothing else animates.
  */
 export function PressureGauge({
   lockedAt,
@@ -51,21 +52,22 @@ export function PressureGauge({
         className="absolute inset-y-0 left-0 bg-verre transition-[width] duration-700 ease-out"
         style={{ width: `${percent}%` }}
       />
-      {thresholds.map((days) => {
-        const tickDate = new Date(targetDate.getTime() - days * 86_400_000);
-        const tickPercent =
-          totalMs > 0
-            ? Math.min(100, Math.max(0, ((tickDate.getTime() - lockedAt.getTime()) / totalMs) * 100))
-            : 100;
-        const passed = now.getTime() >= tickDate.getTime();
-        return (
-          <div
-            key={days}
-            className={`absolute top-0 bottom-0 w-px ${passed ? "bg-capsule" : "bg-lees/50"}`}
-            style={{ left: `${tickPercent}%` }}
-          />
-        );
-      })}
+      {isLarge &&
+        thresholds.map((days) => {
+          const tickDate = new Date(targetDate.getTime() - days * 86_400_000);
+          const tickPercent =
+            totalMs > 0
+              ? Math.min(100, Math.max(0, ((tickDate.getTime() - lockedAt.getTime()) / totalMs) * 100))
+              : 100;
+          const passed = now.getTime() >= tickDate.getTime();
+          return (
+            <div
+              key={days}
+              className={`absolute top-0 bottom-0 w-px ${passed ? "bg-capsule" : "bg-lees/50"}`}
+              style={{ left: `${tickPercent}%` }}
+            />
+          );
+        })}
     </div>
   );
 }

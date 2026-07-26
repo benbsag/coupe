@@ -12,7 +12,7 @@ export default async function DebtsPage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <Header userName={user.name} />
+      <Header />
       <main className="flex-1 px-4 py-6 max-w-2xl w-full mx-auto flex flex-col gap-4">
         <h1 className="font-display text-2xl text-craie">Debts</h1>
         <SettlementsList

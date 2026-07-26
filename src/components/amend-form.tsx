@@ -199,13 +199,23 @@ export function AmendForm({ betId, slug, current }: AmendFormProps) {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="bg-verre text-cave font-medium rounded-sm px-4 py-3 hover:brightness-110 transition-colors disabled:opacity-50"
-      >
-        {pending ? "Proposing…" : "Propose amendment"}
-      </button>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => router.push(`/bets/${slug}`)}
+          disabled={pending}
+          className="flex-1 border border-craie/15 text-lees rounded-sm px-4 py-3 hover:text-craie transition-colors disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="flex-1 bg-verre text-cave font-medium rounded-sm px-4 py-3 hover:brightness-110 transition-colors disabled:opacity-50"
+        >
+          {pending ? "Proposing…" : "Propose amendment"}
+        </button>
+      </div>
     </form>
   );
 }

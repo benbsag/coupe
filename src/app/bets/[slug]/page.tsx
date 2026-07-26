@@ -48,7 +48,7 @@ export default async function BetDetailPage({
 
   return (
     <div className="flex flex-col flex-1">
-      <Header userName={user.name} />
+      <Header />
       <main className="flex-1 px-4 py-6 max-w-2xl w-full mx-auto flex flex-col gap-8">
         <div>
           <div className="flex items-center justify-between mb-2">

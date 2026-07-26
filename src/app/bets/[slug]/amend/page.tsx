@@ -28,7 +28,7 @@ export default async function AmendBetPage({
 
   return (
     <div className="flex flex-col flex-1">
-      <Header userName={user.name} />
+      <Header />
       <main className="flex-1 px-4 py-6 max-w-2xl w-full mx-auto">
         <h1 className="font-display text-2xl text-craie mb-2">Propose an amendment</h1>
         <p className="text-lees text-sm mb-6">{bet.statement}</p>
