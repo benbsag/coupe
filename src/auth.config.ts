@@ -8,6 +8,10 @@ import type { NextAuthConfig } from "next-auth";
  * components) gets the full one built on top of it.
  */
 export const authConfig: NextAuthConfig = {
+  // Must live here (not only in auth.ts): middleware builds its own Auth.js
+  // instance from this edge config, and without trustHost it throws
+  // UntrustedHost on Vercel -> MIDDLEWARE_INVOCATION_FAILED.
+  trustHost: true,
   pages: {
     signIn: "/sign-in",
     verifyRequest: "/sign-in/check-email",
