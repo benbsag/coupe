@@ -47,14 +47,25 @@ export function CoupeAdapter(): Adapter {
     },
 
     async getUserByEmail(email) {
+      const normalized = email.toLowerCase();
       const [row] = await db
         .select()
         .from(users)
-        .where(eq(users.email, email.toLowerCase()));
+        .where(eq(users.email, normalized));
+      // TEMP diagnostic: shows the exact address the magic-link callback
+      // resolves to, so we can tell an invited user apart from a stray one.
+      console.log(
+        `[coupe][auth] getUserByEmail(${JSON.stringify(email)}) -> ${row ? "FOUND " + row.email : "NOT FOUND"}`
+      );
       return row ? toAdapterUser(row) : null;
     },
 
-    async createUser() {
+    async createUser(user) {
+      // TEMP diagnostic: this only fires when getUserByEmail found nothing,
+      // so logging the address reveals exactly who was turned away.
+      console.error(
+        `[coupe][auth] createUser BLOCKED for ${JSON.stringify(user?.email)} (not a seeded account)`
+      );
       throw new Error(
         "Coupe is invite-only: accounts are seeded, not created at sign-in."
       );
