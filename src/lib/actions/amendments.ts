@@ -321,18 +321,8 @@ export async function voteOnAmendment(
 
   if (!result.ok) return result;
 
-  if (result.outcome === "rejected" || result.outcome === "approved") {
-    const others = await otherParticipants(result.betId!, user.id);
-    for (const recipient of others) {
-      await dispatchImmediate({
-        betId: result.betId!,
-        userId: recipient.id,
-        kind: result.outcome === "approved" ? "AMENDMENT_APPROVED" : "AMENDMENT_REJECTED",
-        eventId: amendmentId,
-        betStatement: result.betStatement!,
-      });
-    }
-  }
+  // No email on the amendment's outcome — only the proposal itself notifies
+  // the other party (see proposeAmendment). The vote result is visible in-app.
 
   if (result.outcome === "approved" && result.dateChanged) {
     await cancelPendingThresholds(result.betId!);

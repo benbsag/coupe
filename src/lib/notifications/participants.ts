@@ -1,6 +1,15 @@
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { positions, users } from "@/db/schema";
+
+/**
+ * Everyone other than the given user. Used at proposal time to reach the
+ * counterparty, who hasn't taken a position yet — so we can't rely on the
+ * positions table the way the other helpers here do.
+ */
+export async function counterpartyUsers(excludeUserId: string) {
+  return db.select().from(users).where(ne(users.id, excludeUserId));
+}
 
 export async function betParticipants(betId: string) {
   const rows = await db

@@ -1,48 +1,29 @@
-import { DateTime } from "luxon";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { bets, notifications, positions, users } from "@/db/schema";
-import { ladderThresholds } from "@/lib/notification-ladder";
-import { gaugeTarget } from "@/lib/bet-display";
 import { applyQuietHours } from "./quiet-hours";
 
-interface ThresholdEntry {
-  label: string;
-  scheduledFor: Date;
-}
-
-function computeThresholdEntries(lockedAt: Date, target: Date): ThresholdEntry[] {
-  const durationDays = (target.getTime() - lockedAt.getTime()) / 86_400_000;
-  const days = ladderThresholds(durationDays);
-  return days.map((d) => ({
-    label: d === 0 ? "immediate" : `${d}d`,
-    scheduledFor: new Date(target.getTime() - d * 86_400_000),
-  }));
-}
+// One month, expressed in days, ahead of a fixed-date bet's deadline.
+const REMINDER_LEAD_DAYS = 30;
 
 /**
- * §4.1: computes the ladder for a just-locked bet and inserts one
- * notification row per (threshold, recipient), plus the fixed 09:00
- * Europe/Zurich "deadline reached" notification for the day after target.
- * Thresholds already in the past at lock time are skipped, not backfilled.
+ * Schedules the single pre-deadline reminder for a just-locked bet: for
+ * FIXED_DATE bets only, one email to each party one month before the
+ * resolution date. Event-triggered and contingent bets have no fixed
+ * deadline to count down to, so they get no reminder. If the bet locks
+ * within a month of its deadline, the reminder is simply skipped (never
+ * backfilled to fire immediately).
  */
 export async function scheduleThresholdNotifications(betId: string): Promise<void> {
   const [bet] = await db.select().from(bets).where(eq(bets.id, betId));
   if (!bet || !bet.lockedAt) return;
-  const target = gaugeTarget(bet);
-  if (!target) return;
+  if (bet.kind !== "FIXED_DATE" || !bet.resolutionDate) return;
 
-  const now = new Date();
-  const entries = computeThresholdEntries(bet.lockedAt, target).filter(
-    (e) => e.scheduledFor > now
+  const reminderAt = new Date(
+    bet.resolutionDate.getTime() - REMINDER_LEAD_DAYS * 86_400_000
   );
-
-  const deadlineReachedAt = DateTime.fromJSDate(target, { zone: "utc" })
-    .setZone("Europe/Zurich")
-    .plus({ days: 1 })
-    .set({ hour: 9, minute: 0, second: 0, millisecond: 0 })
-    .toUTC()
-    .toJSDate();
+  const now = new Date();
+  if (reminderAt <= now) return;
 
   const betPositions = await db
     .select()
@@ -58,30 +39,15 @@ export async function scheduleThresholdNotifications(betId: string): Promise<voi
   const rows: (typeof notifications.$inferInsert)[] = [];
   for (const recipient of recipients) {
     if (!recipient.notifyEmail) continue;
-
-    for (const entry of entries) {
-      rows.push({
-        betId,
-        userId: recipient.id,
-        kind: "THRESHOLD",
-        thresholdLabel: entry.label,
-        channel: "email",
-        scheduledFor: applyQuietHours(entry.scheduledFor, recipient.timezone),
-        dedupeKey: `${betId}:THRESHOLD:${entry.label}:${recipient.id}`,
-      });
-    }
-
-    if (deadlineReachedAt > now) {
-      rows.push({
-        betId,
-        userId: recipient.id,
-        kind: "DEADLINE_REACHED",
-        thresholdLabel: "deadline",
-        channel: "email",
-        scheduledFor: deadlineReachedAt,
-        dedupeKey: `${betId}:DEADLINE_REACHED:${recipient.id}`,
-      });
-    }
+    rows.push({
+      betId,
+      userId: recipient.id,
+      kind: "THRESHOLD",
+      thresholdLabel: `${REMINDER_LEAD_DAYS}d`,
+      channel: "email",
+      scheduledFor: applyQuietHours(reminderAt, recipient.timezone),
+      dedupeKey: `${betId}:THRESHOLD:${recipient.id}`,
+    });
   }
 
   if (rows.length > 0) {
@@ -97,9 +63,9 @@ export async function cancelAllPendingNotifications(betId: string): Promise<void
 }
 
 /**
- * Cancels only unsent threshold/deadline rows — used when an amendment
- * changes a date the ladder depends on, so schedule can be recomputed
- * fresh (§4.1: "recompute future thresholds and drop ones already sent").
+ * Cancels only the unsent one-month reminder — used when an amendment
+ * changes the resolution date (or kind) the reminder depends on, so the
+ * schedule can be recomputed fresh against the new date.
  */
 export async function cancelPendingThresholds(betId: string): Promise<void> {
   await db
@@ -108,7 +74,7 @@ export async function cancelPendingThresholds(betId: string): Promise<void> {
       and(
         eq(notifications.betId, betId),
         isNull(notifications.sentAt),
-        inArray(notifications.kind, ["THRESHOLD", "DEADLINE_REACHED"])
+        eq(notifications.kind, "THRESHOLD")
       )
     );
 }

@@ -108,6 +108,10 @@ export function AmendForm({ betId, slug, current }: AmendFormProps) {
 
       <section className="flex flex-col gap-2">
         <label className="text-sm text-lees">Terms</label>
+        <p className="text-lees text-xs -mt-1">
+          The ground rules and definitions — what the bet is about and what key
+          words mean. Not the pass/fail test itself.
+        </p>
         <textarea
           name="terms"
           required
@@ -149,6 +153,11 @@ export function AmendForm({ betId, slug, current }: AmendFormProps) {
         <label className="text-sm text-lees">
           What counts as YES? (resolution criteria, min. 40 characters)
         </label>
+        <p className="text-lees text-xs -mt-1">
+          The exact test applied at resolution — the specific, arguable
+          condition and the source of truth. If Terms are the rules, this is
+          the referee&apos;s ruling.
+        </p>
         <textarea
           name="resolutionCriteria"
           required

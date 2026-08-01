@@ -55,9 +55,21 @@ export function NewBetForm({ userId }: { userId: string }) {
         <div className="flex flex-col gap-2">
           {(
             [
-              ["FIXED_DATE", "Fixed date", "Resolves NO if it hasn't happened by a deadline."],
-              ["EVENT_TRIGGERED", "Event-triggered", "Only resolvable once some trigger fires; date unknown."],
-              ["CONTINGENT", "Contingent", "May never resolve — requires a long-stop date."],
+              [
+                "FIXED_DATE",
+                "Fixed date",
+                "Has a hard deadline. If it hasn't happened by that date, it resolves NO.",
+              ],
+              [
+                "EVENT_TRIGGERED",
+                "Event-triggered",
+                "You expect it to happen — you just don't know when. Can only be called once the event fires (e.g. “when Apple ships the headset”). No fixed deadline.",
+              ],
+              [
+                "CONTINGENT",
+                "Contingent",
+                "Might never happen at all (e.g. “if they fight, X wins”). If the trigger never occurs, it voids at a long-stop date.",
+              ],
             ] as const
           ).map(([value, label, hint]) => (
             <label
@@ -85,6 +97,11 @@ export function NewBetForm({ userId }: { userId: string }) {
 
       <section className="flex flex-col gap-2">
         <label className="text-sm text-lees">Terms</label>
+        <p className="text-lees text-xs -mt-1">
+          The ground rules and definitions — what the bet is about, what key
+          words mean, what&apos;s in or out of scope. Sets up the bet; it&apos;s
+          not the pass/fail test itself.
+        </p>
         <textarea
           name="terms"
           required
@@ -143,6 +160,11 @@ export function NewBetForm({ userId }: { userId: string }) {
         <label className="text-sm text-lees">
           What counts as YES? (resolution criteria, min. 40 characters)
         </label>
+        <p className="text-lees text-xs -mt-1">
+          The exact test applied at resolution to call it YES — the specific,
+          arguable condition and who or what is the source of truth. If Terms
+          are the rules, this is the referee&apos;s ruling.
+        </p>
         <textarea
           name="resolutionCriteria"
           required

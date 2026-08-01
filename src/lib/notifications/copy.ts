@@ -1,17 +1,15 @@
 export type Tone = "dry" | "rowdy";
 
+// The four notification events the app sends, plus a neutral void notice.
+// Anything not listed here no longer generates email (see the notifications
+// rework: proposal → counterparty, 1-month fixed-date reminder → both,
+// amendment proposed → counterparty, winner announced → both).
 export type NotificationKind =
+  | "BET_PROPOSED"
   | "THRESHOLD"
-  | "DEADLINE_REACHED"
-  | "NUDGE"
-  | "RESOLUTION_WINNER"
-  | "RESOLUTION_LOSER"
-  | "RESOLUTION_VOID"
   | "AMENDMENT_PROPOSED"
-  | "AMENDMENT_APPROVED"
-  | "AMENDMENT_REJECTED"
-  | "OUTCOME_PROPOSED"
-  | "OUTCOME_DISPUTED";
+  | "RESOLUTION_ANNOUNCED"
+  | "RESOLUTION_VOID";
 
 interface PoolEntry {
   template: string;
@@ -29,82 +27,50 @@ interface PoolEntry {
 // The rowdy lines are the spec's own copy verbatim; dry is a flatter
 // counterpart authored to match — the spec only fully writes out rowdy.
 const POOLS: Record<NotificationKind, Record<Tone, PoolEntry[]>> = {
-  RESOLUTION_WINNER: {
+  // 1. A bet is proposed → sent to the counterparty.
+  BET_PROPOSED: {
     rowdy: [
-      { template: "Get ready to drink some good shit. {loser} owes you {bottles}." },
-      { template: "You called it. {loser} is buying. Choose expensively." },
-      { template: "{bet} — resolved in your favour. Cellar incoming." },
-      { template: "Correct, and insufferable about it. {bottles} from {loser}." },
+      { template: "{proposer} just threw down: {bet} Pick a side." },
+      { template: "New wager from {proposer}: {bet} You in?" },
     ],
     dry: [
-      { template: "{bet} resolved in your favour. {loser} owes you {bottles}." },
-      { template: "You were right. {bottles} owed by {loser}." },
-      { template: "Outcome confirmed: you win. {bottles} from {loser}." },
-      { template: "{bet} settled in your favour. {loser} owes {bottles}." },
+      { template: "{proposer} proposed a bet: {bet} Take a side to lock it in." },
+      { template: "{proposer} wants to bet you on: {bet}" },
     ],
   },
-  RESOLUTION_LOSER: {
-    rowdy: [
-      { template: "Get your wallet out — {winner} is thirsty for champagne." },
-      { template: "{bet} did not go your way. You owe {bottles}. No grocery-store fizz." },
-      { template: "Wrong, and now poorer. {winner} is waiting." },
-      { template: "Time to visit a wine shop and think about your choices." },
-    ],
-    dry: [
-      { template: "{bet} did not resolve in your favour. You owe {winner} {bottles}." },
-      { template: "Outcome confirmed: you lose. {bottles} owed to {winner}." },
-      { template: "{bet} settled against you. {bottles} due to {winner}." },
-      { template: "You owe {winner} {bottles} on {bet}." },
-    ],
-  },
-  RESOLUTION_VOID: {
-    rowdy: [{ template: "{bet} voided. No harm, no bottles, no bragging rights." }],
-    dry: [{ template: "{bet} resolved VOID. No settlement was created." }],
-  },
+  // 2. Fixed-date bets → a single reminder one month before the deadline,
+  //    sent to both parties. Copy is month-oriented rather than {days}-generic
+  //    since this only ever fires at the one-month mark now.
   THRESHOLD: {
     rowdy: [
-      { template: "{days} days until {bet} settles. Feeling confident?" },
-      { template: "48 hours. {bet}. Last chance to quietly hope.", matchDays: 2 },
-      {
-        template: "Three months out on {bet}. Just so you can't claim you were ambushed.",
-        matchDays: 90,
-      },
+      { template: "One month to pour: {bet} settles in about four weeks." },
+      { template: "Champagne clock: {bet} is due to resolve in a month." },
     ],
     dry: [
-      { template: "{days} days until {bet} is due to resolve." },
-      { template: "{bet} resolves in {days} days." },
-      { template: "Reminder: {bet} is due in {days} days." },
+      { template: "One month until {bet} is due to resolve." },
+      { template: "Reminder: {bet} resolves in about a month." },
     ],
   },
-  DEADLINE_REACHED: {
-    rowdy: [{ template: "Time's up. Someone call it. {bet}" }],
-    dry: [{ template: "{bet} has passed its resolution date. Awaiting a call." }],
-  },
-  NUDGE: {
-    rowdy: [
-      { template: "{bet} passed its date {days} days ago and nobody's been brave enough to call it." },
-    ],
-    dry: [{ template: "{bet} passed its resolution date {days} days ago. Still uncalled." }],
-  },
+  // 3. An amendment is proposed → sent to the other party to respond.
   AMENDMENT_PROPOSED: {
     rowdy: [{ template: "{proposer} wants to tweak the terms of {bet}. Go weigh in." }],
-    dry: [{ template: "{proposer} proposed an amendment to {bet}." }],
+    dry: [{ template: "{proposer} proposed an amendment to {bet}. Approve or reject it." }],
   },
-  AMENDMENT_APPROVED: {
-    rowdy: [{ template: "The amendment to {bet} went through. Terms updated." }],
-    dry: [{ template: "The amendment to {bet} was approved. Terms updated." }],
+  // 4. A bet closes with a winner → sent to both parties.
+  RESOLUTION_ANNOUNCED: {
+    rowdy: [
+      { template: "Time to pour some champagne for {winner}. {bet}" },
+      { template: "Time to pour some champagne for {winner} — they called {bet} right." },
+    ],
+    dry: [
+      { template: "Time to pour some champagne for {winner}. {bet} is settled." },
+      { template: "{bet} is settled — {winner} won. Time to pour some champagne." },
+    ],
   },
-  AMENDMENT_REJECTED: {
-    rowdy: [{ template: "The amendment to {bet} got voted down." }],
-    dry: [{ template: "The amendment to {bet} was rejected." }],
-  },
-  OUTCOME_PROPOSED: {
-    rowdy: [{ template: "{proposer} just called {bet}. Confirm or dispute." }],
-    dry: [{ template: "{proposer} proposed an outcome for {bet}." }],
-  },
-  OUTCOME_DISPUTED: {
-    rowdy: [{ template: "{bet} is being disputed. No arbitration here — sort it out yourselves." }],
-    dry: [{ template: "The proposed outcome for {bet} was disputed." }],
+  // A bet closes with no winner (void) → neutral note to both parties.
+  RESOLUTION_VOID: {
+    rowdy: [{ template: "{bet} closed void. No winner, no champagne this time." }],
+    dry: [{ template: "{bet} resolved void. No winner and no settlement." }],
   },
 };
 
@@ -116,16 +82,10 @@ function seededIndex(seed: string, length: number): number {
   return hash % length;
 }
 
-export function bottleLabel(count: number): string {
-  return count === 1 ? "a bottle" : `${count} bottles`;
-}
-
 export interface CopyPlaceholders {
   winner?: string;
-  loser?: string;
   proposer?: string;
   bet: string;
-  bottles?: string;
   days?: string;
   date?: string;
 }
@@ -140,9 +100,9 @@ function renderTemplate(template: string, placeholders: CopyPlaceholders): strin
 /**
  * Picks a variant for (kind, tone) deterministically from betId — same bet
  * always reads the same voice for a given moment — then substitutes
- * placeholders. Variants hardcoding a specific lead time are only
- * eligible when placeholders.days actually matches, so a 90-day-out
- * notification can never claim "48 hours" is all that's left.
+ * placeholders. Unknown kinds (e.g. a stale queued row from a since-removed
+ * notification type) fall back to the bare bet statement rather than
+ * throwing, so the cron never wedges on old data.
  */
 export function renderNotificationCopy(
   kind: NotificationKind,
@@ -150,7 +110,9 @@ export function renderNotificationCopy(
   betId: string,
   placeholders: CopyPlaceholders
 ): string {
-  const pool = POOLS[kind][tone];
+  const kindPool = POOLS[kind];
+  if (!kindPool) return placeholders.bet;
+  const pool = kindPool[tone];
   const daysNum = placeholders.days !== undefined ? Number(placeholders.days) : undefined;
   const eligible = pool.filter(
     (e) => e.matchDays === undefined || e.matchDays === daysNum

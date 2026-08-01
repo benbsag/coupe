@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { bets, notifications, users } from "@/db/schema";
 import { sendMail } from "@/lib/email";
 import { renderNotificationCopy, type NotificationKind } from "./copy";
-import { queueDueNudges } from "./nudges";
 
 function daysFromThresholdLabel(label: string | null): string | undefined {
   if (!label) return undefined;
@@ -38,16 +37,14 @@ export interface CronSummary {
 }
 
 /**
- * §4.2: runs once daily in production (Vercel Cron on the Hobby plan; see
- * vercel.json). Picks up all due, unsent notifications — both pre-scheduled
- * threshold/deadline rows and freshly queued nudges — so a slower cadence
- * only delays delivery, never drops it. Groups them per recipient, sending
- * one digest email when a user has 3+ due in this run, individual emails
- * otherwise.
+ * Runs once daily in production (Vercel Cron on the Hobby plan; see
+ * vercel.json). Picks up all due, unsent notifications — in practice the
+ * one-month fixed-date reminders scheduled at lock time — so a slower
+ * cadence only delays delivery, never drops it. Groups them per recipient,
+ * sending one digest email when a user has 3+ due in this run, individual
+ * emails otherwise.
  */
 export async function runNotificationCron(): Promise<CronSummary> {
-  await queueDueNudges();
-
   const now = new Date();
   const due = await db
     .select({

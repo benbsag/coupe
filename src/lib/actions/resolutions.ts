@@ -13,9 +13,9 @@ import {
 } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/current-user";
 import { proposeResolutionSchema } from "@/lib/validation/resolution";
-import { dispatchImmediate, dispatchResolutionNotifications } from "@/lib/notifications/dispatch";
+import { dispatchResolutionNotifications } from "@/lib/notifications/dispatch";
 import { cancelAllPendingNotifications } from "@/lib/notifications/schedule";
-import { otherParticipants, betPositionUsers } from "@/lib/notifications/participants";
+import { betPositionUsers } from "@/lib/notifications/participants";
 import type { ActionResult } from "./bets";
 
 const RESOLVABLE_STATUSES = ["ACTIVE", "AWAITING_RESOLUTION", "DISPUTED"];
@@ -62,7 +62,9 @@ export async function proposeResolution(
     };
   }
 
-  const resolutionId = await db.transaction(async (tx) => {
+  // Proposing an outcome no longer emails — only the final winner (or void)
+  // announcement does. The proposal itself is visible in-app.
+  await db.transaction(async (tx) => {
     const [resolution] = await tx
       .insert(resolutions)
       .values({
@@ -93,21 +95,7 @@ export async function proposeResolution(
         .set({ status: "AWAITING_RESOLUTION" })
         .where(eq(bets.id, betId));
     }
-
-    return resolution.id;
   });
-
-  const others = await otherParticipants(betId, user.id);
-  for (const recipient of others) {
-    await dispatchImmediate({
-      betId,
-      userId: recipient.id,
-      kind: "OUTCOME_PROPOSED",
-      eventId: resolutionId,
-      betStatement: bet.statement,
-      placeholders: { proposer: user.name },
-    });
-  }
 
   revalidatePath(`/bets/${bet.slug}`);
   return { ok: true, slug: bet.slug };
@@ -254,18 +242,8 @@ export async function voteOnResolution(
 
   if (!result.ok) return result;
 
-  if (result.outcome === "disputed") {
-    const others = await otherParticipants(result.betId, user.id);
-    for (const recipient of others) {
-      await dispatchImmediate({
-        betId: result.betId,
-        userId: recipient.id,
-        kind: "OUTCOME_DISPUTED",
-        eventId: resolutionId,
-        betStatement: result.betStatement,
-      });
-    }
-  }
+  // A disputed outcome doesn't email — the dispute is surfaced in-app and a
+  // fresh proposal is the way forward.
 
   if (result.outcome === "confirmed") {
     const positionUsers = await betPositionUsers(result.betId);

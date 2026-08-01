@@ -1,27 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { notifications, settlements, users } from "@/db/schema";
+import { notifications, users } from "@/db/schema";
 import { sendMail } from "@/lib/email";
 import {
   renderNotificationCopy,
-  bottleLabel,
   type NotificationKind,
   type CopyPlaceholders,
 } from "./copy";
 import { applyQuietHours } from "./quiet-hours";
-
-/**
- * §4.3: "{bottles} is computed per recipient — the count of settlement
- * rows between that pair." Not scoped to a single bet, so a pair who
- * already owe each other from a prior bet see the cumulative count.
- */
-async function countBottlesBetween(debtorId: string, creditorId: string): Promise<number> {
-  const rows = await db
-    .select()
-    .from(settlements)
-    .where(and(eq(settlements.debtorId, debtorId), eq(settlements.creditorId, creditorId)));
-  return rows.length;
-}
 
 /**
  * Records the notification (for dedupe/audit) and either sends it right
@@ -81,10 +67,10 @@ export async function dispatchImmediate(params: {
 }
 
 /**
- * Fans out the "bet settled" event (§4.1) to every position-holder with
- * outcome-appropriate copy: winners and losers get different pools, VOID
- * gets a neutral notice, and nobody gets blamed or credited outside the
- * bet itself.
+ * Announces a settled bet to both parties. When there's a winner, everyone
+ * gets the same "time to pour some champagne for {winner}" note; a VOID
+ * outcome gets a neutral "no winner" note instead. Nobody is singled out as
+ * the loser — the announcement reads the same for both recipients.
  */
 export async function dispatchResolutionNotifications(params: {
   betId: string;
@@ -108,34 +94,19 @@ export async function dispatchResolutionNotifications(params: {
     return;
   }
 
-  const winners = positionUsers.filter((p) => p.side === outcome);
-  const losers = positionUsers.filter((p) => p.side !== outcome);
+  const winnerName = positionUsers
+    .filter((p) => p.side === outcome)
+    .map((p) => p.name)
+    .join(" & ");
 
-  for (const winner of winners) {
-    for (const loser of losers) {
-      const bottles = await countBottlesBetween(loser.userId, winner.userId);
-      await dispatchImmediate({
-        betId,
-        userId: winner.userId,
-        kind: "RESOLUTION_WINNER",
-        eventId: `${resolutionId}:${loser.userId}`,
-        betStatement,
-        placeholders: { loser: loser.name, bottles: bottleLabel(bottles) },
-      });
-    }
-  }
-
-  for (const loser of losers) {
-    for (const winner of winners) {
-      const bottles = await countBottlesBetween(loser.userId, winner.userId);
-      await dispatchImmediate({
-        betId,
-        userId: loser.userId,
-        kind: "RESOLUTION_LOSER",
-        eventId: `${resolutionId}:${winner.userId}`,
-        betStatement,
-        placeholders: { winner: winner.name, bottles: bottleLabel(bottles) },
-      });
-    }
+  for (const p of positionUsers) {
+    await dispatchImmediate({
+      betId,
+      userId: p.userId,
+      kind: "RESOLUTION_ANNOUNCED",
+      eventId: resolutionId,
+      betStatement,
+      placeholders: { winner: winnerName },
+    });
   }
 }

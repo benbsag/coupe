@@ -14,6 +14,8 @@ import { zurichEndOfDayToUtc } from "@/lib/dates";
 import { slugify } from "@/lib/slug";
 import { contentHashFor } from "@/lib/hash";
 import { scheduleThresholdNotifications } from "@/lib/notifications/schedule";
+import { dispatchImmediate } from "@/lib/notifications/dispatch";
+import { counterpartyUsers } from "@/lib/notifications/participants";
 
 export interface ActionResult {
   ok: boolean;
@@ -61,7 +63,7 @@ export async function createAndSendBet(rawInput: unknown): Promise<ActionResult>
 
   const slug = slugify(input.statement);
 
-  await db.transaction(async (tx) => {
+  const betId = await db.transaction(async (tx) => {
     const [bet] = await tx
       .insert(bets)
       .values({
@@ -90,7 +92,23 @@ export async function createAndSendBet(rawInput: unknown): Promise<ActionResult>
       { betId: bet.id, actorId: user.id, action: "CREATED", meta: { kind: input.kind } },
       { betId: bet.id, actorId: user.id, action: "PROPOSED", meta: { side: input.side } },
     ]);
+
+    return bet.id;
   });
+
+  // Notify the counterparty that a bet is waiting for them to take a side.
+  // They don't hold a position yet, so this reaches the other user directly.
+  const counterparties = await counterpartyUsers(user.id);
+  for (const recipient of counterparties) {
+    await dispatchImmediate({
+      betId,
+      userId: recipient.id,
+      kind: "BET_PROPOSED",
+      eventId: betId,
+      betStatement: input.statement,
+      placeholders: { proposer: user.name },
+    });
+  }
 
   revalidatePath("/");
   redirect(`/bets/${slug}`);
